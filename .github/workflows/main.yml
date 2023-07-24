@@ -23,97 +23,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: "Checkout source code"
         run: |
-          cd generator/ 
+          cd generator/
           yarn install 
           yarn build 
           cd .. 
-          zip -r generator.zip generator/build/ 
+          zip -r generator.zip generator/build/
           zip -r generator.zip generator/node_modules/
       - uses: actions/upload-artifact@v3
         with:
           name: lambda-requirements
           retention-days: 5
           path: generator.zip
-
-  terraform-check:
-    name: Terraform Lint and Setup
-    needs: [build]
-    with:
-      environment: test
-      navigate_to_terraform: "cd terraform"
-      artifact: lambda-requirements
-      command: "terraform fmt -check && terraform validate"
-    secrets: inherit
-
-  ### Terraform TEST ###
-
-  terraform-plan-test:
-    name: Terraform Plan Test
-    needs: [terraform-check]
-    with:
-      environment: test
-      is_deployment: false
-      artifact: lambda-requirements
-      navigate_to_terraform: "cd terraform"
-      command: "terraform plan"
-    secrets: inherit
-
-  terraform-apply-test:
-    name: Terraform Apply Test
-    needs: [terraform-plan-test]
-    with:
-      navigate_to_terraform: "cd terraform"
-      environment: test
-      artifact: lambda-requirements
-      command: "terraform apply -auto-approve"
-    secrets: inherit
-
-  ### Terraform STAGE ###
-
-  terraform-plan-stage:
-    name: Terraform Plan Stage
-    if: ${{ !github.event.pull_request }}
-    needs: [terraform-check]
-    with:
-      navigate_to_terraform: "cd terraform"
-      environment: stage
-      is_deployment: false
-      artifact: lambda-requirements
-      command: "terraform plan"
-    secrets: inherit
-
-  terraform-apply-stage:
-    name: Terraform Apply Stage
-    if: ${{ !github.event.pull_request }}
-    needs: [terraform-apply-test, terraform-plan-stage]
-    with:
-      navigate_to_terraform: "cd terraform"
-      environment: stage
-      artifact: lambda-requirements
-      command: "terraform apply -auto-approve"
-    secrets: inherit
-
-  ### Terraform PROD ###
-
-  terraform-plan-prod:
-    name: Terraform Plan Prod
-    if: ${{ !github.event.pull_request }}
-    needs: [terraform-check]
-    with:
-      navigate_to_terraform: "cd terraform"
-      environment: prod
-      is_deployment: false
-      artifact: lambda-requirements
-      command: "terraform plan"
-    secrets: inherit
-
-  terraform-apply-prod:
-    name: Terraform Apply Prod
-    if: ${{ !github.event.pull_request }}
-    needs: [terraform-apply-stage, terraform-plan-prod]
-    with:
-      navigate_to_terraform: "cd terraform"
-      environment: prod
-      artifact: lambda-requirements
-      command: "terraform apply -auto-approve"
-    secrets: inherit
