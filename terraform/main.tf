@@ -1,41 +1,46 @@
-module "lambda_function" {
-  source  = "terraform-aws-modules/lambda/aws"
-  version = "2.23.0"
 
-  function_name          = local.lambda_function_name
-  handler                = local.lambda_handler
-  local_existing_package = "../generator.zip"
-  runtime                = "nodejs14.x"
-  publish                = true
-  timeout                = 120
-  memory_size            = 2048
-
-  create_package = false
-
-
-
-  environment_variables = {
-    PRIVATE_FILES_BUCKET_NAME = "bunker-planner-private-pdf"
-    REGION                    = var.aws_region
-    PUBLIC_FILES_BUCKET_NAME  = "bunker-planner-public-pdf"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">=4.63.0"
+    }
   }
+}
 
-  tags = merge(local.required_tags, {
-    function = "pdf lambda for ${var.application_name}"
-  })
+provider "aws" {
+  region     = local.aws_region
+  access_key = "AKIA5QG3U4D4QJKJXBN6"
+  secret_key = "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"
+
 }
 
 
-module "alias" {
-  source  = "terraform-aws-modules/lambda/aws//modules/alias"
-  version = "2.22.0"
+locals {
+  my_function_source = "../generator.zip"
+}
 
-  name = var.application_name
+resource "aws_s3_bucket" "mybucket" {
+  acl = "private"
+}
 
-  use_existing_alias = false
-  refresh_alias      = false
+resource "aws_s3_object" "my_function" {
+  bucket = aws_s3_bucket.mybucket.id
+  key    = "${filemd5(local.my_function_source)}.zip"
+  source = local.my_function_source
+}
 
-  function_name    = module.lambda_function.lambda_function_name
-  function_version = module.lambda_function.lambda_function_version
+module "lambda_function_existing_package_s3" {
+  source = "terraform-aws-modules/lambda/aws"
 
+  function_name = "my-lambda-existing-package-local"
+  description   = "My awesome lambda function"
+  handler       = "index.lambda_handler"
+  runtime       = "python3.8"
+
+  create_package = false
+  s3_existing_package = {
+    bucket = aws_s3_bucket.mybucket.id
+    key    = aws_s3_object.my_function.id
+  }
 }
